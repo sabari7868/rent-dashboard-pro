@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -11,8 +10,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Building2,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -29,6 +30,8 @@ const navItems = [
 ];
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+  const { signOut, user } = useAuth();
+
   return (
     <motion.aside
       initial={false}
@@ -91,8 +94,30 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         ))}
       </nav>
 
-      {/* Collapse Toggle */}
-      <div className="p-3 border-t border-sidebar-border">
+      {/* User & Logout */}
+      <div className="p-3 border-t border-sidebar-border space-y-2">
+        {user && (
+          <div className={cn("flex items-center gap-3 px-3 py-2", collapsed && "justify-center")}>
+            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary shrink-0">
+              {user.email?.[0].toUpperCase()}
+            </div>
+            {!collapsed && (
+              <span className="text-sm text-sidebar-foreground truncate">
+                {user.email}
+              </span>
+            )}
+          </div>
+        )}
+        <button
+          onClick={signOut}
+          className={cn(
+            "flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-destructive/10 transition-colors text-destructive",
+            collapsed && "justify-center"
+          )}
+        >
+          <LogOut className="h-5 w-5 shrink-0" />
+          {!collapsed && <span className="text-sm font-medium">Logout</span>}
+        </button>
         <button
           onClick={onToggle}
           className="flex items-center justify-center w-full py-2 rounded-lg hover:bg-sidebar-accent transition-colors text-sidebar-foreground"
