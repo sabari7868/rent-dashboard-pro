@@ -14,16 +14,291 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      members: {
+        Row: {
+          avatar: string | null
+          created_at: string
+          email: string | null
+          id: string
+          join_date: string | null
+          name: string
+          phone: string | null
+          room_no: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          avatar?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          join_date?: string | null
+          name: string
+          phone?: string | null
+          room_no?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          avatar?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          join_date?: string | null
+          name?: string
+          phone?: string | null
+          room_no?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      months: {
+        Row: {
+          created_at: string
+          eb_curr: number | null
+          eb_per_head: number | null
+          eb_prev: number | null
+          eb_total: number | null
+          eb_units: number | null
+          extra_per_head: number | null
+          extra_total: number | null
+          gas: number | null
+          id: string
+          internet: number | null
+          misc: number | null
+          month_name: string
+          month_year: string
+          total_members: number | null
+          total_rent: number | null
+          unit_rate: number | null
+          updated_at: string
+          water: number | null
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          eb_curr?: number | null
+          eb_per_head?: number | null
+          eb_prev?: number | null
+          eb_total?: number | null
+          eb_units?: number | null
+          extra_per_head?: number | null
+          extra_total?: number | null
+          gas?: number | null
+          id?: string
+          internet?: number | null
+          misc?: number | null
+          month_name: string
+          month_year: string
+          total_members?: number | null
+          total_rent?: number | null
+          unit_rate?: number | null
+          updated_at?: string
+          water?: number | null
+          year: number
+        }
+        Update: {
+          created_at?: string
+          eb_curr?: number | null
+          eb_per_head?: number | null
+          eb_prev?: number | null
+          eb_total?: number | null
+          eb_units?: number | null
+          extra_per_head?: number | null
+          extra_total?: number | null
+          gas?: number | null
+          id?: string
+          internet?: number | null
+          misc?: number | null
+          month_name?: string
+          month_year?: string
+          total_members?: number | null
+          total_rent?: number | null
+          unit_rate?: number | null
+          updated_at?: string
+          water?: number | null
+          year?: number
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          member_id: string
+          notes: string | null
+          payment_date: string
+          payment_type: string
+          status: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          member_id: string
+          notes?: string | null
+          payment_date?: string
+          payment_type?: string
+          status?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          member_id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_type?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      rent_records: {
+        Row: {
+          advance: number | null
+          created_at: string
+          eb_share: number | null
+          extra_share: number | null
+          final_total: number | null
+          id: string
+          member_id: string
+          month_id: string
+          paid_date: string | null
+          payment_note: string | null
+          payment_status: string
+          rent: number | null
+          updated_at: string
+        }
+        Insert: {
+          advance?: number | null
+          created_at?: string
+          eb_share?: number | null
+          extra_share?: number | null
+          final_total?: number | null
+          id?: string
+          member_id: string
+          month_id: string
+          paid_date?: string | null
+          payment_note?: string | null
+          payment_status?: string
+          rent?: number | null
+          updated_at?: string
+        }
+        Update: {
+          advance?: number | null
+          created_at?: string
+          eb_share?: number | null
+          extra_share?: number | null
+          final_total?: number | null
+          id?: string
+          member_id?: string
+          month_id?: string
+          paid_date?: string | null
+          payment_note?: string | null
+          payment_status?: string
+          rent?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rent_records_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rent_records_month_id_fkey"
+            columns: ["month_id"]
+            isOneToOne: false
+            referencedRelation: "months"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_member_id: { Args: { _user_id: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +425,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "member"],
+    },
   },
 } as const
