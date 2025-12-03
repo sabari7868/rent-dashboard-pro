@@ -8,7 +8,7 @@ import {
   TrendingUp,
   Clock,
   CheckCircle,
-  XCircle,
+  Loader2,
 } from 'lucide-react';
 import {
   LineChart,
@@ -32,32 +32,65 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { payments, monthlyStats } from '@/lib/data';
-
-const paymentChartData = monthlyStats.map((stat) => ({
-  month: stat.month,
-  amount: stat.rent + stat.eb + stat.expenses,
-}));
+import { usePayments } from '@/hooks/usePayments';
+import { useMonths } from '@/hooks/useMonths';
 
 const Payments = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
+  const { data: payments = [], isLoading: loadingPayments, error } = usePayments();
+  const { data: months = [] } = useMonths();
+
   const filteredPayments = payments.filter((payment) => {
-    const matchesSearch = payment.memberName
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    const matchesType = typeFilter === 'all' || payment.type === typeFilter;
+    const memberName = payment.member?.name || '';
+    const matchesSearch = memberName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = typeFilter === 'all' || payment.payment_type === typeFilter;
     return matchesSearch && matchesType;
   });
 
   const totalCollected = payments
     .filter((p) => p.status === 'completed')
-    .reduce((acc, p) => acc + p.amount, 0);
+    .reduce((acc, p) => acc + Number(p.amount), 0);
 
   const pendingAmount = payments
     .filter((p) => p.status === 'pending')
-    .reduce((acc, p) => acc + p.amount, 0);
+    .reduce((acc, p) => acc + Number(p.amount), 0);
+
+  const thisMonthPayments = payments
+    .filter((p) => {
+      const paymentDate = new Date(p.payment_date);
+      const now = new Date();
+      return p.status === 'completed' && 
+        paymentDate.getMonth() === now.getMonth() &&
+        paymentDate.getFullYear() === now.getFullYear();
+    })
+    .reduce((acc, p) => acc + Number(p.amount), 0);
+
+  const paymentChartData = months.slice(0, 6).reverse().map((month) => ({
+    month: month.month_name?.slice(0, 3) || '',
+    amount: Number(month.total_rent || 0) + Number(month.eb_total || 0) + Number(month.extra_total || 0),
+  }));
+
+  if (loadingPayments) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64 text-destructive">
+          Error loading payments: {error.message}
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -90,14 +123,7 @@ const Payments = () => {
           },
           {
             title: 'This Month',
-            value: `₹${payments
-              .filter(
-                (p) =>
-                  p.status === 'completed' &&
-                  new Date(p.date).getMonth() === new Date().getMonth()
-              )
-              .reduce((acc, p) => acc + p.amount, 0)
-              .toLocaleString()}`,
+            value: `₹${thisMonthPayments.toLocaleString()}`,
             icon: TrendingUp,
             color: 'primary',
           },
@@ -139,32 +165,38 @@ const Payments = () => {
             <CardTitle className="text-lg">Payment Trend</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={paymentChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis
-                  dataKey="month"
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={12}
-                />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--popover))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                  }}
-                  formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Amount']}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="amount"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                  dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {paymentChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={paymentChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis
+                    dataKey="month"
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={12}
+                  />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--popover))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                    }}
+                    formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Amount']}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="amount"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                No data available
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>
@@ -206,41 +238,47 @@ const Payments = () => {
         transition={{ delay: 0.5 }}
         className="space-y-3"
       >
-        {filteredPayments.map((payment, index) => (
-          <motion.div
-            key={payment.id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.05 }}
-            className="flex items-center justify-between p-4 rounded-xl border bg-card shadow-soft hover:shadow-lg transition-all"
-          >
-            <div className="flex items-center gap-4">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
-                {payment.memberName.split(' ').map((n) => n[0]).join('')}
-              </div>
-              <div>
-                <p className="font-medium text-foreground">{payment.memberName}</p>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="capitalize">{payment.type}</span>
-                  <span>•</span>
-                  <span>
-                    {new Date(payment.date).toLocaleDateString('en-IN', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </span>
+        {filteredPayments.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            No payments found
+          </div>
+        ) : (
+          filteredPayments.map((payment, index) => (
+            <motion.div
+              key={payment.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.05 }}
+              className="flex items-center justify-between p-4 rounded-xl border bg-card shadow-soft hover:shadow-lg transition-all"
+            >
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+                  {payment.member?.avatar || payment.member?.name?.split(' ').map((n) => n[0]).join('') || '?'}
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">{payment.member?.name || 'Unknown'}</p>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span className="capitalize">{payment.payment_type}</span>
+                    <span>•</span>
+                    <span>
+                      {new Date(payment.payment_date).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <StatusBadge status={payment.status as 'completed' | 'pending' | 'failed'} />
-              <span className="font-semibold text-lg text-foreground">
-                ₹{payment.amount.toLocaleString()}
-              </span>
-            </div>
-          </motion.div>
-        ))}
+              <div className="flex items-center gap-4">
+                <StatusBadge status={payment.status as 'completed' | 'pending' | 'failed'} />
+                <span className="font-semibold text-lg text-foreground">
+                  ₹{Number(payment.amount).toLocaleString()}
+                </span>
+              </div>
+            </motion.div>
+          ))
+        )}
       </motion.div>
     </AppLayout>
   );
