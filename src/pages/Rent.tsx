@@ -10,6 +10,7 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
+  Loader2,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -31,7 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { rentRecords } from '@/lib/data';
+import { useRentRecords, useDeleteRentRecord } from '@/hooks/useRentRecords';
 
 const Rent = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,12 +40,13 @@ const Rent = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
+  const { data: rentRecords = [], isLoading, error } = useRentRecords();
+  const deleteRentRecord = useDeleteRentRecord();
+
   const filteredRecords = rentRecords.filter((record) => {
-    const matchesSearch = record.memberName
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      statusFilter === 'all' || record.status === statusFilter;
+    const memberName = record.member?.name || '';
+    const matchesSearch = memberName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || record.payment_status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -53,6 +55,26 @@ const Rent = () => {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64 text-destructive">
+          Error loading rent records: {error.message}
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -130,99 +152,110 @@ const Rent = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedRecords.map((record, index) => (
-                <motion.tr
-                  key={record.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="group hover:bg-secondary/30 transition-colors"
-                >
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
-                        {record.memberName.split(' ').map((n) => n[0]).join('')}
+              {paginatedRecords.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    No rent records found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedRecords.map((record, index) => (
+                  <motion.tr
+                    key={record.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="group hover:bg-secondary/30 transition-colors"
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+                          {record.member?.avatar || record.member?.name?.split(' ').map((n) => n[0]).join('') || '?'}
+                        </div>
+                        <span className="font-medium text-foreground">
+                          {record.member?.name || 'Unknown'}
+                        </span>
                       </div>
-                      <span className="font-medium text-foreground">
-                        {record.memberName}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {record.month} {record.year}
-                  </TableCell>
-                  <TableCell className="text-right">₹{record.rent.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">₹{record.ebShare.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">₹{record.extraShare.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">
-                    {record.advance > 0 ? (
-                      <span className="text-success">-₹{record.advance.toLocaleString()}</span>
-                    ) : (
-                      '₹0'
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    ₹{record.total.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <StatusBadge status={record.status} />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </motion.tr>
-              ))}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {record.month?.month_name} {record.month?.year}
+                    </TableCell>
+                    <TableCell className="text-right">₹{Number(record.rent || 0).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">₹{Number(record.eb_share || 0).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">₹{Number(record.extra_share || 0).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                      {Number(record.advance || 0) > 0 ? (
+                        <span className="text-success">-₹{Number(record.advance).toLocaleString()}</span>
+                      ) : (
+                        '₹0'
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      ₹{Number(record.final_total || 0).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <StatusBadge status={record.payment_status as 'paid' | 'pending' | 'unpaid'} />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => deleteRentRecord.mutate(record.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </motion.tr>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-between px-4 py-4 border-t">
-          <p className="text-sm text-muted-foreground">
-            Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
-            {Math.min(currentPage * itemsPerPage, filteredRecords.length)} of{' '}
-            {filteredRecords.length} records
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+        {filteredRecords.length > 0 && (
+          <div className="flex items-center justify-between px-4 py-4 border-t">
+            <p className="text-sm text-muted-foreground">
+              Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
+              {Math.min(currentPage * itemsPerPage, filteredRecords.length)} of{' '}
+              {filteredRecords.length} records
+            </p>
+            <div className="flex items-center gap-2">
               <Button
-                key={page}
-                variant={currentPage === page ? 'default' : 'outline'}
+                variant="outline"
                 size="icon"
-                onClick={() => setCurrentPage(page)}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
               >
-                {page}
+                <ChevronLeft className="h-4 w-4" />
               </Button>
-            ))}
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <Button
+                  key={page}
+                  variant={currentPage === page ? 'default' : 'outline'}
+                  size="icon"
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </motion.div>
     </AppLayout>
   );

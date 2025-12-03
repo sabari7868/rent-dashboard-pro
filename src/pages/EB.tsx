@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Zap, Calculator, TrendingUp } from 'lucide-react';
+import { Zap, Calculator, TrendingUp, Loader2 } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -16,23 +16,56 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ebRecords, members } from '@/lib/data';
+import { useMonths, useUpdateMonth, useAddMonth } from '@/hooks/useMonths';
+import { useMembers } from '@/hooks/useMembers';
 
 const EB = () => {
-  const [previousReading, setPreviousReading] = useState(ebRecords[0].previousReading);
-  const [currentReading, setCurrentReading] = useState(ebRecords[0].currentReading);
-  const [perUnitCost, setPerUnitCost] = useState(ebRecords[0].perUnitCost);
+  const { data: months = [], isLoading: loadingMonths } = useMonths();
+  const { data: members = [], isLoading: loadingMembers } = useMembers();
+  const updateMonth = useUpdateMonth();
+  const addMonth = useAddMonth();
+
+  const latestMonth = months[0];
+  
+  const [previousReading, setPreviousReading] = useState(Number(latestMonth?.eb_prev || 0));
+  const [currentReading, setCurrentReading] = useState(Number(latestMonth?.eb_curr || 0));
+  const [perUnitCost, setPerUnitCost] = useState(Number(latestMonth?.unit_rate || 5));
 
   const units = Math.max(0, currentReading - previousReading);
   const totalAmount = units * perUnitCost;
   const activeMembers = members.filter((m) => m.status === 'active').length;
   const perHeadShare = activeMembers > 0 ? totalAmount / activeMembers : 0;
 
-  const chartData = ebRecords.map((record) => ({
-    month: record.month.slice(0, 3),
-    units: record.units,
-    amount: record.totalAmount,
+  const chartData = months.slice(0, 6).reverse().map((record) => ({
+    month: record.month_name?.slice(0, 3) || '',
+    units: Number(record.eb_units || 0),
+    amount: Number(record.eb_total || 0),
   }));
+
+  const handleSave = () => {
+    if (latestMonth) {
+      updateMonth.mutate({
+        id: latestMonth.id,
+        eb_prev: previousReading,
+        eb_curr: currentReading,
+        eb_units: units,
+        unit_rate: perUnitCost,
+        eb_total: totalAmount,
+        eb_per_head: perHeadShare,
+        total_members: activeMembers,
+      });
+    }
+  };
+
+  if (loadingMonths || loadingMembers) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -111,7 +144,13 @@ const EB = () => {
                 </div>
               </div>
 
-              <Button className="w-full mt-4">Save Calculation</Button>
+              <Button 
+                className="w-full mt-4" 
+                onClick={handleSave}
+                disabled={updateMonth.isPending}
+              >
+                {updateMonth.isPending ? 'Saving...' : 'Save Calculation'}
+              </Button>
             </CardContent>
           </Card>
         </motion.div>
@@ -135,9 +174,9 @@ const EB = () => {
               },
               {
                 label: 'Avg. Monthly Units',
-                value: Math.round(
-                  ebRecords.reduce((acc, r) => acc + r.units, 0) / ebRecords.length
-                ),
+                value: months.length > 0 
+                  ? Math.round(months.reduce((acc, r) => acc + Number(r.eb_units || 0), 0) / months.length)
+                  : 0,
                 change: 'Last 6 months',
                 isPositive: null,
               },
@@ -183,26 +222,32 @@ const EB = () => {
                 Last 6 months
               </div>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--popover))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Bar
-                  dataKey="units"
-                  name="Units"
-                  fill="hsl(var(--warning))"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--popover))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                    }}
+                  />
+                  <Bar
+                    dataKey="units"
+                    name="Units"
+                    fill="hsl(var(--warning))"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                No data available
+              </div>
+            )}
           </motion.div>
 
           {/* History Table */}
@@ -219,52 +264,48 @@ const EB = () => {
               <table className="w-full">
                 <thead>
                   <tr className="bg-secondary/50">
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">
-                      Month
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">
-                      Previous
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">
-                      Current
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">
-                      Units
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">
-                      Amount
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">
-                      Per Head
-                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Month</th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">Previous</th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">Current</th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">Units</th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">Amount</th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">Per Head</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {ebRecords.slice(0, 5).map((record, index) => (
-                    <tr
-                      key={record.id}
-                      className="border-b last:border-0 hover:bg-secondary/30 transition-colors"
-                    >
-                      <td className="px-4 py-3 text-sm text-foreground">
-                        {record.month} {record.year}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-muted-foreground">
-                        {record.previousReading}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-muted-foreground">
-                        {record.currentReading}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right font-medium text-foreground">
-                        {record.units}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right font-medium text-warning">
-                        ₹{record.totalAmount.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right font-medium text-foreground">
-                        ₹{record.perHeadShare.toFixed(2)}
+                  {months.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                        No EB records found
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    months.slice(0, 5).map((record) => (
+                      <tr
+                        key={record.id}
+                        className="border-b last:border-0 hover:bg-secondary/30 transition-colors"
+                      >
+                        <td className="px-4 py-3 text-sm text-foreground">
+                          {record.month_name} {record.year}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right text-muted-foreground">
+                          {Number(record.eb_prev || 0)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right text-muted-foreground">
+                          {Number(record.eb_curr || 0)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right font-medium text-foreground">
+                          {Number(record.eb_units || 0)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right font-medium text-warning">
+                          ₹{Number(record.eb_total || 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right font-medium text-foreground">
+                          ₹{Number(record.eb_per_head || 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

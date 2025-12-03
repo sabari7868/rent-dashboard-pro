@@ -1,26 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Wallet, Droplets, Flame, Wifi, MoreHorizontal, Save } from 'lucide-react';
+import { Wallet, Droplets, Flame, Wifi, MoreHorizontal, Save, Loader2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { expenses, members } from '@/lib/data';
-
-const expenseIcons = {
-  water: Droplets,
-  gas: Flame,
-  internet: Wifi,
-  misc: MoreHorizontal,
-};
+import { useMonths, useUpdateMonth } from '@/hooks/useMonths';
+import { useMembers } from '@/hooks/useMembers';
 
 const Extra = () => {
-  const [water, setWater] = useState(expenses[0].water);
-  const [gas, setGas] = useState(expenses[0].gas);
-  const [internet, setInternet] = useState(expenses[0].internet);
-  const [misc, setMisc] = useState(expenses[0].misc);
+  const { data: months = [], isLoading: loadingMonths } = useMonths();
+  const { data: members = [], isLoading: loadingMembers } = useMembers();
+  const updateMonth = useUpdateMonth();
+
+  const latestMonth = months[0];
+
+  const [water, setWater] = useState(0);
+  const [gas, setGas] = useState(0);
+  const [internet, setInternet] = useState(0);
+  const [misc, setMisc] = useState(0);
+
+  useEffect(() => {
+    if (latestMonth) {
+      setWater(Number(latestMonth.water || 0));
+      setGas(Number(latestMonth.gas || 0));
+      setInternet(Number(latestMonth.internet || 0));
+      setMisc(Number(latestMonth.misc || 0));
+    }
+  }, [latestMonth]);
 
   const total = water + gas + internet + misc;
   const activeMembers = members.filter((m) => m.status === 'active').length;
@@ -32,6 +41,31 @@ const Extra = () => {
     { id: 'internet', label: 'Internet', value: internet, setValue: setInternet, icon: Wifi, color: 'primary' },
     { id: 'misc', label: 'Miscellaneous', value: misc, setValue: setMisc, icon: MoreHorizontal, color: 'muted' },
   ];
+
+  const handleSave = () => {
+    if (latestMonth) {
+      updateMonth.mutate({
+        id: latestMonth.id,
+        water,
+        gas,
+        internet,
+        misc,
+        extra_total: total,
+        extra_per_head: perHead,
+        total_members: activeMembers,
+      });
+    }
+  };
+
+  if (loadingMonths || loadingMembers) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -132,9 +166,13 @@ const Extra = () => {
                 </div>
               </div>
 
-              <Button className="w-full gap-2 mt-4">
+              <Button 
+                className="w-full gap-2 mt-4" 
+                onClick={handleSave}
+                disabled={updateMonth.isPending}
+              >
                 <Save className="h-4 w-4" />
-                Save Expenses
+                {updateMonth.isPending ? 'Saving...' : 'Save Expenses'}
               </Button>
             </CardContent>
           </Card>
@@ -155,58 +193,52 @@ const Extra = () => {
           <table className="w-full">
             <thead>
               <tr className="bg-secondary/50">
-                <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">
-                  Month
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">
-                  Water
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">
-                  Gas
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">
-                  Internet
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">
-                  Misc
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">
-                  Total
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">
-                  Per Head
-                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Month</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">Water</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">Gas</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">Internet</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">Misc</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">Total</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold text-foreground">Per Head</th>
               </tr>
             </thead>
             <tbody>
-              {expenses.map((expense) => (
-                <tr
-                  key={expense.id}
-                  className="border-b last:border-0 hover:bg-secondary/30 transition-colors"
-                >
-                  <td className="px-4 py-3 text-sm text-foreground">
-                    {expense.month} {expense.year}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-muted-foreground">
-                    ₹{expense.water}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-muted-foreground">
-                    ₹{expense.gas}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-muted-foreground">
-                    ₹{expense.internet}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-muted-foreground">
-                    ₹{expense.misc}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right font-medium text-foreground">
-                    ₹{expense.total}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right font-medium text-primary">
-                    ₹{expense.perHead}
+              {months.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                    No expense records found
                   </td>
                 </tr>
-              ))}
+              ) : (
+                months.map((expense) => (
+                  <tr
+                    key={expense.id}
+                    className="border-b last:border-0 hover:bg-secondary/30 transition-colors"
+                  >
+                    <td className="px-4 py-3 text-sm text-foreground">
+                      {expense.month_name} {expense.year}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right text-muted-foreground">
+                      ₹{Number(expense.water || 0)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right text-muted-foreground">
+                      ₹{Number(expense.gas || 0)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right text-muted-foreground">
+                      ₹{Number(expense.internet || 0)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right text-muted-foreground">
+                      ₹{Number(expense.misc || 0)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right font-medium text-foreground">
+                      ₹{Number(expense.extra_total || 0)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right font-medium text-primary">
+                      ₹{Number(expense.extra_per_head || 0).toFixed(2)}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
