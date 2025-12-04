@@ -7,6 +7,7 @@ import {
   Wallet,
   TrendingUp,
   TrendingDown,
+  Loader2,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { StatCard } from '@/components/dashboard/StatCard';
@@ -16,22 +17,78 @@ import {
   PaymentStatusChart,
 } from '@/components/dashboard/Charts';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { members, rentRecords, ebRecords, expenses } from '@/lib/data';
+import { useMembers } from '@/hooks/useMembers';
+import { useMonths } from '@/hooks/useMonths';
+import { useRentRecords } from '@/hooks/useRentRecords';
+import { usePayments } from '@/hooks/usePayments';
 
 const Index = () => {
-  // Calculate dashboard stats
-  const totalMembers = members.filter((m) => m.status === 'active').length;
-  const totalRent = rentRecords
-    .filter((r) => r.month === 'November' && r.year === 2024)
-    .reduce((acc, r) => acc + r.rent, 0);
-  const currentEB = ebRecords[0];
-  const currentExpenses = expenses[0];
-  const paidCount = rentRecords.filter(
-    (r) => r.month === 'November' && r.year === 2024 && r.status === 'paid'
+  const { data: members = [], isLoading: membersLoading } = useMembers();
+  const { data: months = [], isLoading: monthsLoading } = useMonths();
+  const { data: rentRecords = [], isLoading: rentLoading } = useRentRecords();
+  const { data: payments = [], isLoading: paymentsLoading } = usePayments();
+
+  const isLoading = membersLoading || monthsLoading || rentLoading || paymentsLoading;
+
+  // Get current/latest month data
+  const currentMonth = months[0];
+  const activeMembers = members.filter((m) => m.status === 'active').length;
+
+  // Calculate dashboard stats from real data
+  const totalRent = currentMonth?.total_rent || 0;
+  const ebUnits = currentMonth?.eb_units || 0;
+  const ebTotal = currentMonth?.eb_total || 0;
+  const ebPerHead = currentMonth?.eb_per_head || 0;
+  const unitRate = currentMonth?.unit_rate || 5;
+  const extraTotal = currentMonth?.extra_total || 0;
+
+  // Payment status from rent records for current month
+  const currentMonthRecords = rentRecords.filter(
+    (r) => r.month_id === currentMonth?.id
+  );
+  const paidCount = currentMonthRecords.filter(
+    (r) => r.payment_status === 'paid'
   ).length;
-  const totalMonthlyRecords = rentRecords.filter(
-    (r) => r.month === 'November' && r.year === 2024
-  ).length;
+  const totalMonthlyRecords = currentMonthRecords.length || 1;
+  const pendingAmount = currentMonthRecords
+    .filter((r) => r.payment_status !== 'paid')
+    .reduce((acc, r) => acc + (r.final_total || 0), 0);
+
+  // Prepare chart data from months
+  const monthlyStats = months.slice(0, 6).reverse().map((m) => ({
+    month: m.month_name?.slice(0, 3) || '',
+    rent: m.total_rent || 0,
+    eb: m.eb_total || 0,
+  }));
+
+  const ebUsageData = months.slice(0, 6).reverse().map((m) => ({
+    month: m.month_name?.slice(0, 3) || '',
+    units: m.eb_units || 0,
+  }));
+
+  const paymentStatusData = [
+    { name: 'Paid', value: paidCount, color: 'hsl(var(--success))' },
+    { name: 'Pending', value: currentMonthRecords.filter((r) => r.payment_status === 'pending').length, color: 'hsl(var(--warning))' },
+    { name: 'Unpaid', value: currentMonthRecords.filter((r) => r.payment_status === 'unpaid').length, color: 'hsl(var(--destructive))' },
+  ];
+
+  // Recent activity from payments
+  const recentActivity = payments.slice(0, 5).map((p) => ({
+    name: p.member?.name || 'Unknown',
+    action: p.payment_type === 'advance' ? 'added advance' : 'paid rent',
+    time: new Date(p.payment_date).toLocaleDateString('en-IN'),
+    amount: `₹${p.amount.toLocaleString()}`,
+  }));
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -48,27 +105,25 @@ const Index = () => {
           value={`₹${totalRent.toLocaleString()}`}
           icon={IndianRupee}
           variant="primary"
-          trend={{ value: 5, isPositive: true }}
           delay={0}
         />
         <StatCard
           title="Active Members"
-          value={totalMembers}
+          value={activeMembers}
           icon={Users}
           variant="success"
           delay={0.1}
         />
         <StatCard
           title="EB Units"
-          value={currentEB.units}
+          value={ebUnits}
           icon={Zap}
           variant="warning"
-          trend={{ value: 6, isPositive: false }}
           delay={0.2}
         />
         <StatCard
           title="Extra Expenses"
-          value={`₹${currentExpenses.total.toLocaleString()}`}
+          value={`₹${extraTotal.toLocaleString()}`}
           icon={Wallet}
           variant="info"
           delay={0.3}
@@ -87,7 +142,7 @@ const Index = () => {
             <div>
               <p className="text-sm text-muted-foreground">Total EB Amount</p>
               <p className="text-2xl font-bold text-foreground mt-1">
-                ₹{currentEB.totalAmount.toLocaleString()}
+                ₹{ebTotal.toLocaleString()}
               </p>
             </div>
             <div className="p-3 rounded-lg bg-warning/10">
@@ -96,11 +151,11 @@ const Index = () => {
           </div>
           <div className="mt-4 flex items-center gap-2">
             <span className="text-xs text-muted-foreground">
-              ₹{currentEB.perHeadShare}/head
+              ₹{ebPerHead}/head
             </span>
             <span className="text-xs text-muted-foreground">•</span>
             <span className="text-xs text-muted-foreground">
-              ₹{currentEB.perUnitCost}/unit
+              ₹{unitRate}/unit
             </span>
           </div>
         </motion.div>
@@ -147,16 +202,7 @@ const Index = () => {
             <div>
               <p className="text-sm text-muted-foreground">Pending Amount</p>
               <p className="text-2xl font-bold text-foreground mt-1">
-                ₹{(
-                  rentRecords
-                    .filter(
-                      (r) =>
-                        r.month === 'November' &&
-                        r.year === 2024 &&
-                        r.status !== 'paid'
-                    )
-                    .reduce((acc, r) => acc + r.total, 0)
-                ).toLocaleString()}
+                ₹{pendingAmount.toLocaleString()}
               </p>
             </div>
             <div className="p-3 rounded-lg bg-destructive/10">
@@ -171,8 +217,8 @@ const Index = () => {
 
       {/* Charts */}
       <div className="grid gap-6 lg:grid-cols-2 mb-6">
-        <RentCollectionChart />
-        <EBUsageChart />
+        <RentCollectionChart data={monthlyStats} />
+        <EBUsageChart data={ebUsageData} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -187,37 +233,39 @@ const Index = () => {
               Recent Activity
             </h3>
             <div className="space-y-4">
-              {[
-                { name: 'Rahul Kumar', action: 'paid rent', time: '2 hours ago', amount: '₹5,650' },
-                { name: 'Priya Sharma', action: 'paid rent', time: '1 day ago', amount: '₹5,150' },
-                { name: 'Sneha Reddy', action: 'added advance', time: '3 days ago', amount: '₹1,000' },
-              ].map((activity, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between py-3 border-b border-border last:border-0"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
-                      {activity.name.split(' ').map((n) => n[0]).join('')}
+              {recentActivity.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No recent activity
+                </p>
+              ) : (
+                recentActivity.map((activity, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between py-3 border-b border-border last:border-0"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+                        {activity.name.split(' ').map((n) => n[0]).join('')}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {activity.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {activity.action} • {activity.time}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {activity.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {activity.action} • {activity.time}
-                      </p>
-                    </div>
+                    <span className="text-sm font-medium text-success">
+                      {activity.amount}
+                    </span>
                   </div>
-                  <span className="text-sm font-medium text-success">
-                    {activity.amount}
-                  </span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </motion.div>
         </div>
-        <PaymentStatusChart />
+        <PaymentStatusChart data={paymentStatusData} />
       </div>
     </AppLayout>
   );

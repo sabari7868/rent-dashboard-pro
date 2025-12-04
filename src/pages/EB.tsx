@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Zap, Calculator, TrendingUp, Loader2 } from 'lucide-react';
 import {
@@ -27,9 +27,17 @@ const EB = () => {
 
   const latestMonth = months[0];
   
-  const [previousReading, setPreviousReading] = useState(Number(latestMonth?.eb_prev || 0));
-  const [currentReading, setCurrentReading] = useState(Number(latestMonth?.eb_curr || 0));
-  const [perUnitCost, setPerUnitCost] = useState(Number(latestMonth?.unit_rate || 5));
+  const [previousReading, setPreviousReading] = useState(0);
+  const [currentReading, setCurrentReading] = useState(0);
+  const [perUnitCost, setPerUnitCost] = useState(5);
+
+  useEffect(() => {
+    if (latestMonth) {
+      setPreviousReading(Number(latestMonth.eb_prev || 0));
+      setCurrentReading(Number(latestMonth.eb_curr || 0));
+      setPerUnitCost(Number(latestMonth.unit_rate || 5));
+    }
+  }, [latestMonth]);
 
   const units = Math.max(0, currentReading - previousReading);
   const totalAmount = units * perUnitCost;
