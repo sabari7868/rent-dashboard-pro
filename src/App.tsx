@@ -11,6 +11,7 @@ import Rent from "./pages/Rent";
 import EB from "./pages/EB";
 import Extra from "./pages/Extra";
 import Members from "./pages/Members";
+import Months from "./pages/Months";
 import Payments from "./pages/Payments";
 import NotFound from "./pages/NotFound";
 
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/eb" element={<ProtectedRoute><EB /></ProtectedRoute>} />
             <Route path="/extra" element={<ProtectedRoute><Extra /></ProtectedRoute>} />
             <Route path="/members" element={<ProtectedRoute><Members /></ProtectedRoute>} />
+            <Route path="/months" element={<ProtectedRoute><Months /></ProtectedRoute>} />
             <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

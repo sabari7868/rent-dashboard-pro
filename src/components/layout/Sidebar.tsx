@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Building2,
   LogOut,
+  Calendar,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,6 +23,7 @@ interface SidebarProps {
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
+  { icon: Calendar, label: 'Months', path: '/months' },
   { icon: Receipt, label: 'Monthly Rent', path: '/rent' },
   { icon: Zap, label: 'EB Calculation', path: '/eb' },
   { icon: Wallet, label: 'Extra Expenses', path: '/extra' },
