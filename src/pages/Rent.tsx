@@ -13,6 +13,8 @@ import {
   Loader2,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { exportToPDF, exportToExcel } from '@/lib/export';
+import { toast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -118,11 +120,25 @@ const Rent = () => {
           </SelectContent>
         </Select>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => {
+              exportToPDF(filteredRecords);
+              toast({ title: 'PDF Export', description: 'PDF opened in new tab for printing' });
+            }}
+          >
             <Download className="h-4 w-4" />
             Export PDF
           </Button>
-          <Button variant="outline" className="gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => {
+              exportToExcel(filteredRecords);
+              toast({ title: 'Excel Export', description: 'CSV file downloaded successfully' });
+            }}
+          >
             <Download className="h-4 w-4" />
             Excel
           </Button>
