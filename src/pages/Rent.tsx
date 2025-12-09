@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Receipt,
@@ -19,6 +19,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -34,16 +35,54 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useRentRecords, useDeleteRentRecord } from '@/hooks/useRentRecords';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { useRentRecords, useDeleteRentRecord, useAddRentRecord, useUpdateRentRecord, RentRecordWithMember } from '@/hooks/useRentRecords';
+import { useMembers } from '@/hooks/useMembers';
+import { useMonths } from '@/hooks/useMonths';
+
+interface RentFormData {
+  member_id: string;
+  month_id: string;
+  rent: number;
+  eb_share: number;
+  extra_share: number;
+  advance: number;
+  payment_status: string;
+}
+
+const initialFormData: RentFormData = {
+  member_id: '',
+  month_id: '',
+  rent: 0,
+  eb_share: 0,
+  extra_share: 0,
+  advance: 0,
+  payment_status: 'pending',
+};
 
 const Rent = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<RentRecordWithMember | null>(null);
+  const [formData, setFormData] = useState<RentFormData>(initialFormData);
   const itemsPerPage = 5;
 
   const { data: rentRecords = [], isLoading, error } = useRentRecords();
+  const { data: members = [] } = useMembers();
+  const { data: months = [] } = useMonths();
   const deleteRentRecord = useDeleteRentRecord();
+  const addRentRecord = useAddRentRecord();
+  const updateRentRecord = useUpdateRentRecord();
 
   const filteredRecords = rentRecords.filter((record) => {
     const memberName = record.member?.name || '';
@@ -56,6 +95,197 @@ const Rent = () => {
   const paginatedRecords = filteredRecords.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
+  );
+
+  const calculateTotal = (data: RentFormData) => {
+    return (Number(data.rent) || 0) + (Number(data.eb_share) || 0) + (Number(data.extra_share) || 0) - (Number(data.advance) || 0);
+  };
+
+  const resetForm = () => {
+    setFormData(initialFormData);
+  };
+
+  const handleAdd = async () => {
+    if (!formData.member_id || !formData.month_id) {
+      toast({ title: 'Error', description: 'Please select member and month', variant: 'destructive' });
+      return;
+    }
+    
+    await addRentRecord.mutateAsync({
+      member_id: formData.member_id,
+      month_id: formData.month_id,
+      rent: formData.rent,
+      eb_share: formData.eb_share,
+      extra_share: formData.extra_share,
+      advance: formData.advance,
+      final_total: calculateTotal(formData),
+      payment_status: formData.payment_status,
+    });
+    
+    setIsAddModalOpen(false);
+    resetForm();
+  };
+
+  const handleEdit = (record: RentRecordWithMember) => {
+    setSelectedRecord(record);
+    setFormData({
+      member_id: record.member_id,
+      month_id: record.month_id,
+      rent: Number(record.rent) || 0,
+      eb_share: Number(record.eb_share) || 0,
+      extra_share: Number(record.extra_share) || 0,
+      advance: Number(record.advance) || 0,
+      payment_status: record.payment_status,
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedRecord) return;
+    
+    await updateRentRecord.mutateAsync({
+      id: selectedRecord.id,
+      member_id: formData.member_id,
+      month_id: formData.month_id,
+      rent: formData.rent,
+      eb_share: formData.eb_share,
+      extra_share: formData.extra_share,
+      advance: formData.advance,
+      final_total: calculateTotal(formData),
+      payment_status: formData.payment_status,
+    });
+    
+    setIsEditModalOpen(false);
+    setSelectedRecord(null);
+    resetForm();
+  };
+
+  const RentRecordForm = ({
+    onSubmit,
+    onClose,
+    isSubmitting,
+    submitLabel,
+  }: {
+    onSubmit: () => void;
+    onClose: () => void;
+    isSubmitting: boolean;
+    submitLabel: string;
+  }) => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Member *</Label>
+          <Select value={formData.member_id} onValueChange={(value) => setFormData({ ...formData, member_id: value })}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select member" />
+            </SelectTrigger>
+            <SelectContent>
+              {members.map((member) => (
+                <SelectItem key={member.id} value={member.id}>
+                  {member.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Month *</Label>
+          <Select value={formData.month_id} onValueChange={(value) => setFormData({ ...formData, month_id: value })}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select month" />
+            </SelectTrigger>
+            <SelectContent>
+              {months.map((month) => (
+                <SelectItem key={month.id} value={month.id}>
+                  {month.month_name} {month.year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="rent">Rent (₹)</Label>
+          <Input
+            id="rent"
+            type="number"
+            value={formData.rent}
+            onChange={(e) => setFormData({ ...formData, rent: Number(e.target.value) })}
+            disabled={isSubmitting}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="eb_share">EB Share (₹)</Label>
+          <Input
+            id="eb_share"
+            type="number"
+            value={formData.eb_share}
+            onChange={(e) => setFormData({ ...formData, eb_share: Number(e.target.value) })}
+            disabled={isSubmitting}
+          />
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="extra_share">Extra Share (₹)</Label>
+          <Input
+            id="extra_share"
+            type="number"
+            value={formData.extra_share}
+            onChange={(e) => setFormData({ ...formData, extra_share: Number(e.target.value) })}
+            disabled={isSubmitting}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="advance">Advance (₹)</Label>
+          <Input
+            id="advance"
+            type="number"
+            value={formData.advance}
+            onChange={(e) => setFormData({ ...formData, advance: Number(e.target.value) })}
+            disabled={isSubmitting}
+          />
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        <Label>Payment Status</Label>
+        <Select value={formData.payment_status} onValueChange={(value) => setFormData({ ...formData, payment_status: value })}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem>
+            <SelectItem value="unpaid">Unpaid</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      
+      <div className="pt-2 border-t">
+        <div className="flex justify-between text-lg font-semibold">
+          <span>Total:</span>
+          <span className="text-primary">₹{calculateTotal(formData).toLocaleString()}</span>
+        </div>
+      </div>
+      
+      <div className="flex gap-3 pt-4">
+        <Button variant="outline" onClick={onClose} className="flex-1" disabled={isSubmitting}>
+          Cancel
+        </Button>
+        <Button 
+          className="flex-1" 
+          onClick={onSubmit} 
+          disabled={isSubmitting || !formData.member_id || !formData.month_id}
+        >
+          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {submitLabel}
+        </Button>
+      </div>
+    </div>
   );
 
   if (isLoading) {
@@ -85,10 +315,31 @@ const Rent = () => {
         description="Manage and track monthly rent payments"
         icon={Receipt}
         action={
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Record
-          </Button>
+          <Dialog open={isAddModalOpen} onOpenChange={(open) => {
+            setIsAddModalOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Record
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Add Rent Record</DialogTitle>
+                <DialogDescription>
+                  Create a new rent record for a member.
+                </DialogDescription>
+              </DialogHeader>
+              <RentRecordForm
+                onSubmit={handleAdd}
+                onClose={() => setIsAddModalOpen(false)}
+                isSubmitting={addRentRecord.isPending}
+                submitLabel="Add Record"
+              />
+            </DialogContent>
+          </Dialog>
         }
       />
 
@@ -171,7 +422,7 @@ const Rent = () => {
               {paginatedRecords.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                    No rent records found
+                    No rent records found. Click "Add Record" to create one.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -214,7 +465,7 @@ const Rent = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(record)}>
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
@@ -273,6 +524,30 @@ const Rent = () => {
           </div>
         )}
       </motion.div>
+
+      {/* Edit Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={(open) => {
+        setIsEditModalOpen(open);
+        if (!open) {
+          setSelectedRecord(null);
+          resetForm();
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Rent Record</DialogTitle>
+            <DialogDescription>
+              Update rent record details.
+            </DialogDescription>
+          </DialogHeader>
+          <RentRecordForm
+            onSubmit={handleUpdate}
+            onClose={() => setIsEditModalOpen(false)}
+            isSubmitting={updateRentRecord.isPending}
+            submitLabel="Save Changes"
+          />
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 };
