@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { motion } from 'framer-motion';
 import { Zap, Calculator, TrendingUp, Loader2 } from 'lucide-react';
 import {
@@ -16,8 +16,112 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { MonthSelector } from '@/components/months/MonthSelector';
 import { useMonths, useUpdateMonth, useAddMonth } from '@/hooks/useMonths';
 import { useMembers } from '@/hooks/useMembers';
+
+interface EBFormData {
+  previousReading: string;
+  currentReading: string;
+  perUnitCost: string;
+}
+
+const EBCalculatorForm = memo(({
+  formData,
+  onChange,
+  units,
+  totalAmount,
+  activeMembers,
+  perHeadShare,
+  onSave,
+  isSaving,
+}: {
+  formData: EBFormData;
+  onChange: (field: keyof EBFormData, value: string) => void;
+  units: number;
+  totalAmount: number;
+  activeMembers: number;
+  perHeadShare: number;
+  onSave: () => void;
+  isSaving: boolean;
+}) => (
+  <Card className="shadow-soft">
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2 text-lg">
+        <Calculator className="h-5 w-5 text-primary" />
+        EB Calculator
+      </CardTitle>
+    </CardHeader>
+    <CardContent className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="previous">Previous Reading</Label>
+        <Input
+          id="previous"
+          type="number"
+          placeholder="Enter previous reading"
+          value={formData.previousReading}
+          onChange={(e) => onChange('previousReading', e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="current">Current Reading</Label>
+        <Input
+          id="current"
+          type="number"
+          placeholder="Enter current reading"
+          value={formData.currentReading}
+          onChange={(e) => onChange('currentReading', e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="perUnit">Per Unit Cost (₹)</Label>
+        <Input
+          id="perUnit"
+          type="number"
+          step="0.5"
+          placeholder="Enter per unit cost"
+          value={formData.perUnitCost}
+          onChange={(e) => onChange('perUnitCost', e.target.value)}
+        />
+      </div>
+
+      <div className="pt-4 border-t space-y-3">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Units Consumed</span>
+          <span className="font-semibold text-foreground">{units}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Total Amount</span>
+          <span className="font-semibold text-warning">
+            ₹{totalAmount.toLocaleString()}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Active Members</span>
+          <span className="font-semibold text-foreground">{activeMembers}</span>
+        </div>
+        <div className="flex justify-between pt-3 border-t">
+          <span className="text-muted-foreground">Per Head Share</span>
+          <span className="font-bold text-lg text-primary">
+            ₹{perHeadShare.toFixed(2)}
+          </span>
+        </div>
+      </div>
+
+      <Button 
+        className="w-full mt-4" 
+        onClick={onSave}
+        disabled={isSaving}
+      >
+        {isSaving ? 'Saving...' : 'Save Calculation'}
+      </Button>
+    </CardContent>
+  </Card>
+));
+
+EBCalculatorForm.displayName = 'EBCalculatorForm';
 
 const EB = () => {
   const { data: months = [], isLoading: loadingMonths } = useMonths();
@@ -25,22 +129,42 @@ const EB = () => {
   const updateMonth = useUpdateMonth();
   const addMonth = useAddMonth();
 
-  const latestMonth = months[0];
-  
-  const [previousReading, setPreviousReading] = useState(0);
-  const [currentReading, setCurrentReading] = useState(0);
-  const [perUnitCost, setPerUnitCost] = useState(5);
+  const [selectedMonthId, setSelectedMonthId] = useState<string>('');
+  const [formData, setFormData] = useState<EBFormData>({
+    previousReading: '',
+    currentReading: '',
+    perUnitCost: '5',
+  });
 
+  const selectedMonth = months.find(m => m.id === selectedMonthId);
+
+  // Set first month as default when months load
   useEffect(() => {
-    if (latestMonth) {
-      setPreviousReading(Number(latestMonth.eb_prev || 0));
-      setCurrentReading(Number(latestMonth.eb_curr || 0));
-      setPerUnitCost(Number(latestMonth.unit_rate || 5));
+    if (months.length > 0 && !selectedMonthId) {
+      setSelectedMonthId(months[0].id);
     }
-  }, [latestMonth]);
+  }, [months, selectedMonthId]);
 
-  const units = Math.max(0, currentReading - previousReading);
-  const totalAmount = units * perUnitCost;
+  // Load month data when selected month changes
+  useEffect(() => {
+    if (selectedMonth) {
+      setFormData({
+        previousReading: selectedMonth.eb_prev ? String(selectedMonth.eb_prev) : '',
+        currentReading: selectedMonth.eb_curr ? String(selectedMonth.eb_curr) : '',
+        perUnitCost: selectedMonth.unit_rate ? String(selectedMonth.unit_rate) : '5',
+      });
+    }
+  }, [selectedMonth]);
+
+  const handleFormChange = useCallback((field: keyof EBFormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const prevReading = parseFloat(formData.previousReading) || 0;
+  const currReading = parseFloat(formData.currentReading) || 0;
+  const unitCost = parseFloat(formData.perUnitCost) || 0;
+  const units = Math.max(0, currReading - prevReading);
+  const totalAmount = units * unitCost;
   const activeMembers = members.filter((m) => m.status === 'active').length;
   const perHeadShare = activeMembers > 0 ? totalAmount / activeMembers : 0;
 
@@ -50,20 +174,25 @@ const EB = () => {
     amount: Number(record.eb_total || 0),
   }));
 
-  const handleSave = () => {
-    if (latestMonth) {
+  const handleSave = useCallback(() => {
+    if (selectedMonthId) {
       updateMonth.mutate({
-        id: latestMonth.id,
-        eb_prev: previousReading,
-        eb_curr: currentReading,
+        id: selectedMonthId,
+        eb_prev: prevReading,
+        eb_curr: currReading,
         eb_units: units,
-        unit_rate: perUnitCost,
+        unit_rate: unitCost,
         eb_total: totalAmount,
         eb_per_head: perHeadShare,
         total_members: activeMembers,
       });
     }
-  };
+  }, [selectedMonthId, prevReading, currReading, units, unitCost, totalAmount, perHeadShare, activeMembers, updateMonth]);
+
+  const handleAddMonth = useCallback(async (monthData: { month_name: string; year: number; month_year: string }) => {
+    const result = await addMonth.mutateAsync(monthData);
+    setSelectedMonthId(result.id);
+  }, [addMonth]);
 
   if (loadingMonths || loadingMembers) {
     return (
@@ -83,6 +212,21 @@ const EB = () => {
         icon={Zap}
       />
 
+      {/* Month Selector */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-6 max-w-xs"
+      >
+        <MonthSelector
+          months={months}
+          selectedMonthId={selectedMonthId}
+          onMonthChange={setSelectedMonthId}
+          onAddMonth={handleAddMonth}
+          isAddingMonth={addMonth.isPending}
+        />
+      </motion.div>
+
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Calculator */}
         <motion.div
@@ -90,77 +234,16 @@ const EB = () => {
           animate={{ opacity: 1, y: 0 }}
           className="lg:col-span-1"
         >
-          <Card className="shadow-soft">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Calculator className="h-5 w-5 text-primary" />
-                EB Calculator
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="previous">Previous Reading</Label>
-                <Input
-                  id="previous"
-                  type="number"
-                  value={previousReading}
-                  onChange={(e) => setPreviousReading(Number(e.target.value))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="current">Current Reading</Label>
-                <Input
-                  id="current"
-                  type="number"
-                  value={currentReading}
-                  onChange={(e) => setCurrentReading(Number(e.target.value))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="perUnit">Per Unit Cost (₹)</Label>
-                <Input
-                  id="perUnit"
-                  type="number"
-                  step="0.5"
-                  value={perUnitCost}
-                  onChange={(e) => setPerUnitCost(Number(e.target.value))}
-                />
-              </div>
-
-              <div className="pt-4 border-t space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Units Consumed</span>
-                  <span className="font-semibold text-foreground">{units}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total Amount</span>
-                  <span className="font-semibold text-warning">
-                    ₹{totalAmount.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Active Members</span>
-                  <span className="font-semibold text-foreground">{activeMembers}</span>
-                </div>
-                <div className="flex justify-between pt-3 border-t">
-                  <span className="text-muted-foreground">Per Head Share</span>
-                  <span className="font-bold text-lg text-primary">
-                    ₹{perHeadShare.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-
-              <Button 
-                className="w-full mt-4" 
-                onClick={handleSave}
-                disabled={updateMonth.isPending}
-              >
-                {updateMonth.isPending ? 'Saving...' : 'Save Calculation'}
-              </Button>
-            </CardContent>
-          </Card>
+          <EBCalculatorForm
+            formData={formData}
+            onChange={handleFormChange}
+            units={units}
+            totalAmount={totalAmount}
+            activeMembers={activeMembers}
+            perHeadShare={perHeadShare}
+            onSave={handleSave}
+            isSaving={updateMonth.isPending}
+          />
         </motion.div>
 
         {/* Stats and Chart */}
