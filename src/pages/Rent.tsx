@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Receipt,
@@ -19,7 +19,6 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -45,32 +44,8 @@ import {
 } from '@/components/ui/dialog';
 import { useRentRecords, useDeleteRentRecord, useAddRentRecord, useUpdateRentRecord, RentRecordWithMember } from '@/hooks/useRentRecords';
 import { useMembers } from '@/hooks/useMembers';
-import { useMonths, useAddMonth } from '@/hooks/useMonths';
-
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-];
-
-interface RentFormData {
-  member_id: string;
-  month_id: string;
-  rent: number;
-  eb_share: number;
-  extra_share: number;
-  advance: number;
-  payment_status: string;
-}
-
-const initialFormData: RentFormData = {
-  member_id: '',
-  month_id: '',
-  rent: 0,
-  eb_share: 0,
-  extra_share: 0,
-  advance: 0,
-  payment_status: 'pending',
-};
+import { useMonths } from '@/hooks/useMonths';
+import { RentRecordForm, initialFormData, RentFormData } from '@/components/rent/RentRecordForm';
 
 const Rent = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -81,11 +56,6 @@ const Rent = () => {
   const [selectedRecord, setSelectedRecord] = useState<RentRecordWithMember | null>(null);
   const [formData, setFormData] = useState<RentFormData>(initialFormData);
   const itemsPerPage = 5;
-  const [showNewMonthForm, setShowNewMonthForm] = useState(false);
-  const [newMonthData, setNewMonthData] = useState({
-    month_name: MONTH_NAMES[new Date().getMonth()],
-    year: new Date().getFullYear(),
-  });
 
   const { data: rentRecords = [], isLoading, error } = useRentRecords();
   const { data: members = [] } = useMembers();
@@ -93,7 +63,6 @@ const Rent = () => {
   const deleteRentRecord = useDeleteRentRecord();
   const addRentRecord = useAddRentRecord();
   const updateRentRecord = useUpdateRentRecord();
-  const addMonth = useAddMonth();
 
   const filteredRecords = rentRecords.filter((record) => {
     const memberName = record.member?.name || '';
@@ -109,27 +78,15 @@ const Rent = () => {
   );
 
   const calculateTotal = (data: RentFormData) => {
-    return (Number(data.rent) || 0) + (Number(data.eb_share) || 0) + (Number(data.extra_share) || 0) - (Number(data.advance) || 0);
+    const rent = parseFloat(data.rent) || 0;
+    const eb = parseFloat(data.eb_share) || 0;
+    const extra = parseFloat(data.extra_share) || 0;
+    const advance = parseFloat(data.advance) || 0;
+    return rent + eb + extra - advance;
   };
 
   const resetForm = () => {
     setFormData(initialFormData);
-    setShowNewMonthForm(false);
-    setNewMonthData({
-      month_name: MONTH_NAMES[new Date().getMonth()],
-      year: new Date().getFullYear(),
-    });
-  };
-
-  const handleCreateMonth = async () => {
-    const monthYear = `${newMonthData.month_name} ${newMonthData.year}`;
-    const result = await addMonth.mutateAsync({
-      month_name: newMonthData.month_name,
-      year: newMonthData.year,
-      month_year: monthYear,
-    });
-    setFormData({ ...formData, month_id: result.id });
-    setShowNewMonthForm(false);
   };
 
   const handleAdd = async () => {
@@ -141,10 +98,10 @@ const Rent = () => {
     await addRentRecord.mutateAsync({
       member_id: formData.member_id,
       month_id: formData.month_id,
-      rent: formData.rent,
-      eb_share: formData.eb_share,
-      extra_share: formData.extra_share,
-      advance: formData.advance,
+      rent: parseFloat(formData.rent) || 0,
+      eb_share: parseFloat(formData.eb_share) || 0,
+      extra_share: parseFloat(formData.extra_share) || 0,
+      advance: parseFloat(formData.advance) || 0,
       final_total: calculateTotal(formData),
       payment_status: formData.payment_status,
     });
@@ -158,10 +115,10 @@ const Rent = () => {
     setFormData({
       member_id: record.member_id,
       month_id: record.month_id,
-      rent: Number(record.rent) || 0,
-      eb_share: Number(record.eb_share) || 0,
-      extra_share: Number(record.extra_share) || 0,
-      advance: Number(record.advance) || 0,
+      rent: record.rent ? String(record.rent) : '',
+      eb_share: record.eb_share ? String(record.eb_share) : '',
+      extra_share: record.extra_share ? String(record.extra_share) : '',
+      advance: record.advance ? String(record.advance) : '',
       payment_status: record.payment_status,
     });
     setIsEditModalOpen(true);
@@ -174,10 +131,10 @@ const Rent = () => {
       id: selectedRecord.id,
       member_id: formData.member_id,
       month_id: formData.month_id,
-      rent: formData.rent,
-      eb_share: formData.eb_share,
-      extra_share: formData.extra_share,
-      advance: formData.advance,
+      rent: parseFloat(formData.rent) || 0,
+      eb_share: parseFloat(formData.eb_share) || 0,
+      extra_share: parseFloat(formData.extra_share) || 0,
+      advance: parseFloat(formData.advance) || 0,
       final_total: calculateTotal(formData),
       payment_status: formData.payment_status,
     });
@@ -186,178 +143,6 @@ const Rent = () => {
     setSelectedRecord(null);
     resetForm();
   };
-
-  const RentRecordForm = ({
-    onSubmit,
-    onClose,
-    isSubmitting,
-    submitLabel,
-  }: {
-    onSubmit: () => void;
-    onClose: () => void;
-    isSubmitting: boolean;
-    submitLabel: string;
-  }) => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Member *</Label>
-          <Select value={formData.member_id} onValueChange={(value) => setFormData({ ...formData, member_id: value })}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select member" />
-            </SelectTrigger>
-            <SelectContent>
-              {members.map((member) => (
-                <SelectItem key={member.id} value={member.id}>
-                  {member.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Month *</Label>
-          {!showNewMonthForm ? (
-            <div className="space-y-2">
-              <Select value={formData.month_id} onValueChange={(value) => setFormData({ ...formData, month_id: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select month" />
-                </SelectTrigger>
-                <SelectContent>
-                  {months.map((month) => (
-                    <SelectItem key={month.id} value={month.id}>
-                      {month.month_name} {month.year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button 
-                type="button" 
-                variant="link" 
-                className="p-0 h-auto text-sm" 
-                onClick={() => setShowNewMonthForm(true)}
-              >
-                + Create new month
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
-              <div className="grid grid-cols-2 gap-2">
-                <Select 
-                  value={newMonthData.month_name} 
-                  onValueChange={(value) => setNewMonthData({ ...newMonthData, month_name: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MONTH_NAMES.map((month) => (
-                      <SelectItem key={month} value={month}>{month}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  type="number"
-                  value={newMonthData.year}
-                  onChange={(e) => setNewMonthData({ ...newMonthData, year: parseInt(e.target.value) })}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button type="button" size="sm" onClick={handleCreateMonth} disabled={addMonth.isPending}>
-                  {addMonth.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-                  Create Month
-                </Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => setShowNewMonthForm(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="rent">Rent (₹)</Label>
-          <Input
-            id="rent"
-            type="number"
-            value={formData.rent}
-            onChange={(e) => setFormData({ ...formData, rent: Number(e.target.value) })}
-            disabled={isSubmitting}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="eb_share">EB Share (₹)</Label>
-          <Input
-            id="eb_share"
-            type="number"
-            value={formData.eb_share}
-            onChange={(e) => setFormData({ ...formData, eb_share: Number(e.target.value) })}
-            disabled={isSubmitting}
-          />
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="extra_share">Extra Share (₹)</Label>
-          <Input
-            id="extra_share"
-            type="number"
-            value={formData.extra_share}
-            onChange={(e) => setFormData({ ...formData, extra_share: Number(e.target.value) })}
-            disabled={isSubmitting}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="advance">Advance (₹)</Label>
-          <Input
-            id="advance"
-            type="number"
-            value={formData.advance}
-            onChange={(e) => setFormData({ ...formData, advance: Number(e.target.value) })}
-            disabled={isSubmitting}
-          />
-        </div>
-      </div>
-      
-      <div className="space-y-2">
-        <Label>Payment Status</Label>
-        <Select value={formData.payment_status} onValueChange={(value) => setFormData({ ...formData, payment_status: value })}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="paid">Paid</SelectItem>
-            <SelectItem value="unpaid">Unpaid</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      
-      <div className="pt-2 border-t">
-        <div className="flex justify-between text-lg font-semibold">
-          <span>Total:</span>
-          <span className="text-primary">₹{calculateTotal(formData).toLocaleString()}</span>
-        </div>
-      </div>
-      
-      <div className="flex gap-3 pt-4">
-        <Button variant="outline" onClick={onClose} className="flex-1" disabled={isSubmitting}>
-          Cancel
-        </Button>
-        <Button 
-          className="flex-1" 
-          onClick={onSubmit} 
-          disabled={isSubmitting || !formData.member_id || !formData.month_id}
-        >
-          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {submitLabel}
-        </Button>
-      </div>
-    </div>
-  );
 
   if (isLoading) {
     return (
@@ -400,10 +185,14 @@ const Rent = () => {
               <DialogHeader>
                 <DialogTitle>Add Rent Record</DialogTitle>
                 <DialogDescription>
-                  Create a new rent record for a member.
+                  Create a new rent record for a member. EB and Extra shares are auto-filled from the selected month.
                 </DialogDescription>
               </DialogHeader>
               <RentRecordForm
+                formData={formData}
+                setFormData={setFormData}
+                members={members}
+                months={months}
                 onSubmit={handleAdd}
                 onClose={() => setIsAddModalOpen(false)}
                 isSubmitting={addRentRecord.isPending}
@@ -500,43 +289,48 @@ const Rent = () => {
                 paginatedRecords.map((record, index) => (
                   <motion.tr
                     key={record.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className="group hover:bg-secondary/30 transition-colors"
+                    className="border-b last:border-0 hover:bg-secondary/30 transition-colors"
                   >
-                    <TableCell>
+                    <TableCell className="font-medium">
                       <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
-                          {record.member?.avatar || record.member?.name?.split(' ').map((n) => n[0]).join('') || '?'}
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+                          {record.member?.avatar || record.member?.name?.split(' ').map(n => n[0]).join('') || '?'}
                         </div>
-                        <span className="font-medium text-foreground">
-                          {record.member?.name || 'Unknown'}
-                        </span>
+                        <span className="text-foreground">{record.member?.name || 'Unknown'}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {record.month?.month_name} {record.month?.year}
                     </TableCell>
-                    <TableCell className="text-right">₹{Number(record.rent || 0).toLocaleString()}</TableCell>
-                    <TableCell className="text-right">₹{Number(record.eb_share || 0).toLocaleString()}</TableCell>
-                    <TableCell className="text-right">₹{Number(record.extra_share || 0).toLocaleString()}</TableCell>
-                    <TableCell className="text-right">
-                      {Number(record.advance || 0) > 0 ? (
-                        <span className="text-success">-₹{Number(record.advance).toLocaleString()}</span>
-                      ) : (
-                        '₹0'
-                      )}
+                    <TableCell className="text-right text-foreground">
+                      ₹{Number(record.rent || 0).toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-right font-semibold">
+                    <TableCell className="text-right text-foreground">
+                      ₹{Number(record.eb_share || 0).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right text-foreground">
+                      ₹{Number(record.extra_share || 0).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right text-foreground">
+                      ₹{Number(record.advance || 0).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-primary">
                       ₹{Number(record.final_total || 0).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-center">
                       <StatusBadge status={record.payment_status as 'paid' | 'pending' | 'unpaid'} />
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(record)}>
+                      <div className="flex justify-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleEdit(record)}
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
@@ -557,17 +351,18 @@ const Rent = () => {
         </div>
 
         {/* Pagination */}
-        {filteredRecords.length > 0 && (
-          <div className="flex items-center justify-between px-4 py-4 border-t">
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t">
             <p className="text-sm text-muted-foreground">
               Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
               {Math.min(currentPage * itemsPerPage, filteredRecords.length)} of{' '}
               {filteredRecords.length} records
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex gap-1">
               <Button
                 variant="outline"
                 size="icon"
+                className="h-8 w-8"
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
               >
@@ -578,6 +373,7 @@ const Rent = () => {
                   key={page}
                   variant={currentPage === page ? 'default' : 'outline'}
                   size="icon"
+                  className="h-8 w-8"
                   onClick={() => setCurrentPage(page)}
                 >
                   {page}
@@ -586,6 +382,7 @@ const Rent = () => {
               <Button
                 variant="outline"
                 size="icon"
+                className="h-8 w-8"
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
               >
@@ -608,14 +405,18 @@ const Rent = () => {
           <DialogHeader>
             <DialogTitle>Edit Rent Record</DialogTitle>
             <DialogDescription>
-              Update rent record details.
+              Update the rent record details.
             </DialogDescription>
           </DialogHeader>
           <RentRecordForm
+            formData={formData}
+            setFormData={setFormData}
+            members={members}
+            months={months}
             onSubmit={handleUpdate}
             onClose={() => setIsEditModalOpen(false)}
             isSubmitting={updateRentRecord.isPending}
-            submitLabel="Save Changes"
+            submitLabel="Update Record"
           />
         </DialogContent>
       </Dialog>
