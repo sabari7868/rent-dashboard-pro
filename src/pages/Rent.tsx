@@ -45,7 +45,12 @@ import {
 } from '@/components/ui/dialog';
 import { useRentRecords, useDeleteRentRecord, useAddRentRecord, useUpdateRentRecord, RentRecordWithMember } from '@/hooks/useRentRecords';
 import { useMembers } from '@/hooks/useMembers';
-import { useMonths } from '@/hooks/useMonths';
+import { useMonths, useAddMonth } from '@/hooks/useMonths';
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
 
 interface RentFormData {
   member_id: string;
@@ -76,6 +81,11 @@ const Rent = () => {
   const [selectedRecord, setSelectedRecord] = useState<RentRecordWithMember | null>(null);
   const [formData, setFormData] = useState<RentFormData>(initialFormData);
   const itemsPerPage = 5;
+  const [showNewMonthForm, setShowNewMonthForm] = useState(false);
+  const [newMonthData, setNewMonthData] = useState({
+    month_name: MONTH_NAMES[new Date().getMonth()],
+    year: new Date().getFullYear(),
+  });
 
   const { data: rentRecords = [], isLoading, error } = useRentRecords();
   const { data: members = [] } = useMembers();
@@ -83,6 +93,7 @@ const Rent = () => {
   const deleteRentRecord = useDeleteRentRecord();
   const addRentRecord = useAddRentRecord();
   const updateRentRecord = useUpdateRentRecord();
+  const addMonth = useAddMonth();
 
   const filteredRecords = rentRecords.filter((record) => {
     const memberName = record.member?.name || '';
@@ -103,6 +114,22 @@ const Rent = () => {
 
   const resetForm = () => {
     setFormData(initialFormData);
+    setShowNewMonthForm(false);
+    setNewMonthData({
+      month_name: MONTH_NAMES[new Date().getMonth()],
+      year: new Date().getFullYear(),
+    });
+  };
+
+  const handleCreateMonth = async () => {
+    const monthYear = `${newMonthData.month_name} ${newMonthData.year}`;
+    const result = await addMonth.mutateAsync({
+      month_name: newMonthData.month_name,
+      year: newMonthData.year,
+      month_year: monthYear,
+    });
+    setFormData({ ...formData, month_id: result.id });
+    setShowNewMonthForm(false);
   };
 
   const handleAdd = async () => {
@@ -190,18 +217,62 @@ const Rent = () => {
         </div>
         <div className="space-y-2">
           <Label>Month *</Label>
-          <Select value={formData.month_id} onValueChange={(value) => setFormData({ ...formData, month_id: value })}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select month" />
-            </SelectTrigger>
-            <SelectContent>
-              {months.map((month) => (
-                <SelectItem key={month.id} value={month.id}>
-                  {month.month_name} {month.year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {!showNewMonthForm ? (
+            <div className="space-y-2">
+              <Select value={formData.month_id} onValueChange={(value) => setFormData({ ...formData, month_id: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {months.map((month) => (
+                    <SelectItem key={month.id} value={month.id}>
+                      {month.month_name} {month.year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button 
+                type="button" 
+                variant="link" 
+                className="p-0 h-auto text-sm" 
+                onClick={() => setShowNewMonthForm(true)}
+              >
+                + Create new month
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+              <div className="grid grid-cols-2 gap-2">
+                <Select 
+                  value={newMonthData.month_name} 
+                  onValueChange={(value) => setNewMonthData({ ...newMonthData, month_name: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTH_NAMES.map((month) => (
+                      <SelectItem key={month} value={month}>{month}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  value={newMonthData.year}
+                  onChange={(e) => setNewMonthData({ ...newMonthData, year: parseInt(e.target.value) })}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" onClick={handleCreateMonth} disabled={addMonth.isPending}>
+                  {addMonth.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                  Create Month
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setShowNewMonthForm(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       
