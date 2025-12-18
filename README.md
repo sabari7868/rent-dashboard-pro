@@ -1,73 +1,89 @@
-# Welcome to your Lovable project
+🏠 Rent Dashboard App
 
-## Project info
+Live Demo: https://myrent.sabaridevops.online
 
-**URL**: https://lovable.dev/projects/96d87973-6607-4779-a699-f163b910b186
+GitHub Repository: https://github.com/sabari7868/rent-dashboard-pro
 
-## How can I edit this code?
+🚀 About the Project
 
-There are several ways of editing your application.
+Rent Dashboard is a modern web application to manage and track rental properties and expenses. Built with React, TypeScript, Tailwind CSS, and shadcn-ui, it provides a fast, responsive, and user-friendly interface for landlords and tenants.
 
-**Use Lovable**
+🛠 Tech Stack
 
-Simply visit the http://myrent.sabaridevops.online/ and start prompting.
+Frontend: React, TypeScript, Vite, Tailwind CSS, shadcn-ui
 
-Changes made via Lovable will be committed automatically to this repo.
+Backend: Supabase (authentication & database)
 
-**Use your preferred IDE**
+Deployment: Docker, AWS EC2, NGINX, Let's Encrypt SSL
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+CI/CD: GitHub Actions, Docker Hub
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+⚡ Features
 
-Follow these steps:
+Add, edit, and delete rental properties
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+Track monthly rent and expenses
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+Responsive design for mobile & desktop
 
-# Step 3: Install the necessary dependencies.
-npm i
+Dockerized for easy deployment
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+HTTPS support with SSL certificates
+
+CI/CD automated deployment via GitHub Actions
+
+📦 Installation & Running Locally
+1. Clone the repository
+git clone https://github.com/sabari7868/rent-dashboard-pro.git
+cd rent-dashboard-pro
+
+2. Install dependencies
+npm install
+
+3. Run locally
 npm run dev
-```
 
-**Edit a file directly in GitHub**
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Open http://localhost:5173
+ in your browser.
 
-**Use GitHub Codespaces**
+Note: Use your own Supabase project ID and keys. Configure them in a .env file locally; do not commit .env.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+🐳 Docker Deployment (Production)
+1. Build the Docker image
+docker build -t sabarisurya/rent-application:latest .
 
-## What technologies are used for this project?
+2. Run the container with HTTPS
+docker run -d \
+  -p 80:80 \
+  -p 443:443 \
+  --name rent-app \
+  -v /etc/letsencrypt/live/myrent.sabaridevops.online/fullchain.pem:/etc/nginx/certs/fullchain.pem \
+  -v /etc/letsencrypt/live/myrent.sabaridevops.online/privkey.pem:/etc/nginx/certs/privkey.pem \
+  sabarisurya/rent-application:latest
 
-This project is built with:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Visit https://myrent.sabaridevops.online
+ to see it live.
 
-## How can I deploy this project?
+⚙️ CI/CD Workflow
 
-Simply open [Lovable](https://lovable.dev/projects/96d87973-6607-4779-a699-f163b910b186) and click on Share -> Publish.
+The project uses GitHub Actions to:
 
-## Can I connect a custom domain to my Lovable project?
+Build the Docker image
 
-Yes, you can!
+Push to Docker Hub
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Deploy automatically to EC2
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+📈 Future Improvements
+
+Add tenant login with role-based access
+
+Integrate real-time notifications for rent updates
+
+Add analytics dashboard for income/expenses
+
+📄 License
+
+This project is licensed under the MIT License.
