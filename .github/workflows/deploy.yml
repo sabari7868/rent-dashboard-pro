@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout the repository
+      # 1️⃣ Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -25,11 +25,17 @@ jobs:
       - name: Build Docker image
         run: docker build -t sabarisurya/rent-application:latest .
 
-      # 4️⃣ Push Docker image
-      - name: Push Docker image
+      # 4️⃣ Push Docker image (latest)
+      - name: Push Docker image (latest)
         run: docker push sabarisurya/rent-application:latest
 
-      # 5️⃣ Deploy to EC2
+      # 5️⃣ Tag image with commit SHA and push
+      - name: Push Docker image (commit SHA)
+        run: |
+          docker tag sabarisurya/rent-application:latest sabarisurya/rent-application:${{ github.sha }}
+          docker push sabarisurya/rent-application:${{ github.sha }}
+
+      # 6️⃣ Deploy to EC2 via SSH
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1
         with:
@@ -40,14 +46,17 @@ jobs:
             echo "Pulling latest Docker image..."
             docker pull sabarisurya/rent-application:latest
 
-            echo "Stopping old container..."
+            echo "Stopping existing container..."
             docker stop rent-app || true
             docker rm rent-app || true
 
             echo "Running new container..."
             docker run -d \
-              --name rent-app \
               -p 80:80 \
+              -p 443:443 \
+              --name rent-app \
+              -v /etc/letsencrypt/live/myrent.sabaridevops.online/fullchain.pem:/etc/nginx/certs/fullchain.pem \
+              -v /etc/letsencrypt/live/myrent.sabaridevops.online/privkey.pem:/etc/nginx/certs/privkey.pem \
               sabarisurya/rent-application:latest
 
             echo "Deployment completed!"
