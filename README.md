@@ -10,7 +10,7 @@ There are several ways of editing your application.
 
 **Use Lovable**
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/96d87973-6607-4779-a699-f163b910b186) and start prompting.
+Simply visit the http://myrent.sabaridevops.online/ and start prompting.
 
 Changes made via Lovable will be committed automatically to this repo.
 
