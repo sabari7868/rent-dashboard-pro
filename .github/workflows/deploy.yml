@@ -25,17 +25,11 @@ jobs:
       - name: Build Docker image
         run: docker build -t sabarisurya/rent-application:latest .
 
-      # 4️⃣ Push Docker image as latest
-      - name: Push Docker image (latest)
+      # 4️⃣ Push Docker image
+      - name: Push Docker image
         run: docker push sabarisurya/rent-application:latest
 
-      # 5️⃣ Tag image with commit SHA and push
-      - name: Push Docker image (commit SHA)
-        run: |
-          docker tag sabarisurya/rent-application:latest sabarisurya/rent-application:${{ github.sha }}
-          docker push sabarisurya/rent-application:${{ github.sha }}
-
-      # 6️⃣ Deploy to EC2 via SSH
+      # 5️⃣ Deploy to EC2
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1
         with:
@@ -46,11 +40,14 @@ jobs:
             echo "Pulling latest Docker image..."
             docker pull sabarisurya/rent-application:latest
 
-            echo "Stopping existing container..."
+            echo "Stopping old container..."
             docker stop rent-app || true
             docker rm rent-app || true
 
             echo "Running new container..."
-            docker run -d -p 80:3000 --name rent-app sabarisurya/rent-application:latest
+            docker run -d \
+              --name rent-app \
+              -p 80:80 \
+              sabarisurya/rent-application:latest
 
             echo "Deployment completed!"
